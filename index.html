@@ -6,8 +6,15 @@
 <title>Market Clash — Bulls vs Bears</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#050b14;color:#f5f7fb;font-family:Arial,sans-serif}
-#app{max-width:1180px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}
-h1{margin:0;font-size:30px}.tag{color:#91a4bc}.pill{padding:8px 12px;border:1px solid #263d59;border-radius:999px;background:#0b1726}.stats{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}.stat{padding:6px 10px;border:1px solid #263d59;border-radius:10px;background:#0b1726;font-size:12px;font-weight:800}.stat span{font-size:15px;margin-left:4px}
+#app{max-width:1180px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.walletbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.walletbtn{background:#17385c;border-color:#4b83b8;padding:9px 14px}
+.walletaddr{font-size:12px;color:#a9c0d8;background:#081523;border:1px solid #29425f;border-radius:999px;padding:8px 11px}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.stat{padding:7px 10px;border:1px solid #263d59;border-radius:999px;background:#0b1726;font-size:12px}
+.stat b{font-size:14px}
+
+h1{margin:0;font-size:30px}.tag{color:#91a4bc}.pill{padding:8px 12px;border:1px solid #263d59;border-radius:999px;background:#0b1726}
 .arena{margin-top:12px;position:relative;height:590px;border:1px solid #29425f;border-radius:24px;overflow:hidden;background:linear-gradient(#10243a,#07101d 68%,#081522)}
 .sky{position:absolute;inset:0;background:radial-gradient(circle at 50% 10%,#274c6d55,transparent 45%)}
 .grid{position:absolute;left:-10%;right:-10%;bottom:-90px;height:300px;transform:perspective(400px) rotateX(58deg);background-image:linear-gradient(#3d628055 1px,transparent 1px),linear-gradient(90deg,#3d628055 1px,transparent 1px);background-size:45px 45px}
@@ -31,7 +38,22 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 </head>
 <body>
 <div id="app">
-<div class="top"><div><h1>🐂 MARKET CLASH 🐻</h1><div class="tag">Bulls vs Bears — fight for market dominance</div><div class="stats"><div class="stat">🐂 Player Wins: <span id="bullWins">0</span></div><div class="stat">🐻 Bear Wins: <span id="bearWins">0</span></div><div class="stat">⚔️ Total Battles: <span id="totalWins">0</span></div></div></div><div class="pill">💰 Market: <b id="price">$100</b></div></div>
+<div class="top">
+<div>
+<h1>🐂 MARKET CLASH 🐻</h1>
+<div class="tag">Bulls vs Bears — fight for market dominance</div>
+<div class="walletbar">
+<button class="walletbtn" id="walletBtn" onclick="connectWallet()">🔗 Connect Wallet</button>
+<span class="walletaddr" id="walletAddr">Wallet not connected</span>
+</div>
+<div class="stats">
+<span class="stat">🐂 Bull wins: <b id="bullWins">0</b></span>
+<span class="stat">🐻 Bear wins: <b id="bearWins">0</b></span>
+<span class="stat">💎 Clash Points: <b id="points">1000</b></span>
+</div>
+</div>
+<div class="pill">💰 Market: <b id="price">$100</b></div>
+</div>
 <div class="arena" id="arena">
 <div class="sky"></div><div class="grid"></div>
 <div class="chart"><canvas id="cv"></canvas></div>
@@ -45,7 +67,14 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 <div class="fighter bear" id="bear"><div class="char">🐻</div><div class="name">BEAR</div><div class="status" id="rs">Ready to short</div></div>
 <div id="overlay"><div class="winbox"><h2 id="winner">BULL WINS!</h2><p id="reason">The bear was liquidated.</p><button onclick="newGame()">⚔️ Fight Again</button></div></div>
 <div class="controls">
-<div class="turn" id="turn">Your turn — choose a move</div>
+<div class="turn" id="turn">Choose your side to start</div>
+<div style="display:flex;justify-content:center;gap:8px;margin-bottom:9px;flex-wrap:wrap">
+<button onclick="chooseSide('BULL')" id="bullSide">🐂 Play Bull</button>
+<button onclick="chooseSide('BEAR')" id="bearSide">🐻 Play Bear</button>
+</div>
+<div style="text-align:center;font-size:12px;color:#9db1c8;margin-bottom:9px">
+Virtual entry: <b>100 Clash Points</b> · Winner receives the virtual pool
+</div>
 <div class="moves">
 <button onclick="attack('pump')"><b>🚀</b>Pump<div class="moveinfo">12–20 dmg · 10 EN</div></button>
 <button onclick="attack('break')"><b>📈</b>Breakout<div class="moveinfo">25 dmg · 20 EN</div></button>
@@ -60,48 +89,161 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 </div>
 <script>
 let B,R,BE,RE,block=false,round=1,busy=false,over=false;
+let playerSide=null, playerPoints=Number(localStorage.getItem('mc_points')||1000);
+let bullWins=Number(localStorage.getItem('mc_bullWins')||0);
+let bearWins=Number(localStorage.getItem('mc_bearWins')||0);
+let walletAddress=null;
+
 const $=id=>document.getElementById(id);
-const statsKey='marketClashStats';
-let stats=JSON.parse(localStorage.getItem(statsKey)||'{"bull":0,"bear":0}');
-function saveStats(){localStorage.setItem(statsKey,JSON.stringify(stats));renderStats()}
-function renderStats(){const bw=$('bullWins'),rw=$('bearWins'),tw=$('totalWins');if(bw)bw.textContent=stats.bull;if(rw)rw.textContent=stats.bear;if(tw)tw.textContent=stats.bull+stats.bear}
 function log(x){$('log').innerHTML='<div>'+x+'</div>'+$('log').innerHTML}
-function render(){ $('bhp').style.width=B+'%';$('rhp').style.width=R+'%';$('be').style.width=BE+'%';$('re').style.width=RE+'%';$('price').textContent='$'+Math.max(1,Math.round(100+(B-R)*.35));$('round').textContent='ROUND '+round;
-document.querySelectorAll('.moves button').forEach(x=>x.disabled=busy||over)}
+function saveStats(){
+  localStorage.setItem('mc_points',String(playerPoints));
+  localStorage.setItem('mc_bullWins',String(bullWins));
+  localStorage.setItem('mc_bearWins',String(bearWins));
+}
+function shortAddr(a){return a?a.slice(0,6)+'…'+a.slice(-4):'Wallet not connected'}
+function render(){
+  $('bhp').style.width=B+'%';$('rhp').style.width=R+'%';
+  $('be').style.width=BE+'%';$('re').style.width=RE+'%';
+  $('price').textContent='$'+Math.max(1,Math.round(100+(B-R)*.35));
+  $('round').textContent='ROUND '+round;
+  $('points').textContent=playerPoints;
+  $('bullWins').textContent=bullWins;
+  $('bearWins').textContent=bearWins;
+  document.querySelectorAll('.moves button').forEach(x=>x.disabled=busy||over||!playerSide);
+  $('bullSide').disabled=!!playerSide||over;
+  $('bearSide').disabled=!!playerSide||over;
+}
 function anim(id,c){let e=$(id);e.classList.remove(c);void e.offsetWidth;e.classList.add(c)}
 function dmg(n){let crit=Math.random()<.14;return {n:crit?Math.round(n*1.5):n,crit}}
+
+async function connectWallet(){
+  if(!window.ethereum){
+    log('🔗 No browser wallet detected. Install MetaMask or another EVM wallet extension.');
+    return;
+  }
+  try{
+    const accounts=await window.ethereum.request({method:'eth_requestAccounts'});
+    walletAddress=accounts[0];
+    $('walletAddr').textContent=shortAddr(walletAddress);
+    $('walletBtn').textContent='✅ Wallet Connected';
+    log('🔗 Wallet connected: '+shortAddr(walletAddress));
+  }catch(e){
+    log('⚠️ Wallet connection was cancelled.');
+  }
+}
+
+function chooseSide(side){
+  if(over||playerSide)return;
+  if(playerPoints<100){
+    log('💎 You need at least 100 Clash Points to play.');
+    return;
+  }
+  playerSide=side;
+  playerPoints-=100;                 // virtual points only
+  B=100;R=100;BE=100;RE=100;block=false;round=1;busy=false;over=false;
+  $('turn').textContent=side==='BULL'?'🐂 You are BULL — choose a move':'🐻 You are BEAR — choose a move';
+  $('bs').textContent=side==='BULL'?'You':'AI opponent';
+  $('rs').textContent=side==='BEAR'?'You':'AI opponent';
+  $('log').innerHTML='';
+  log('⚔️ '+side+' selected. 100 virtual Clash Points entered.');
+  log('🤖 The opponent has entered 100 virtual Clash Points.');
+  saveStats();render();
+}
+
 function attack(type){
-if(busy||over)return;
-const costs={pump:10,break:20,dip:15,squeeze:40,shield:12,allin:60},cost=costs[type];
-if(BE<cost){log('⚡ Not enough energy.');return}
-BE-=cost;busy=true;let hit=0,heal=0,txt='';
-if(type==='pump'){hit=dmg(12+Math.floor(Math.random()*9));txt='🚀 Bull pumped the market for '+hit.n+' damage.'}
-if(type==='break'){if(Math.random()<.2){txt='📉 Fakeout! The breakout failed.';hit={n:0,crit:false}}else{hit=dmg(25);txt='📈 Bull broke resistance for '+hit.n+' damage.'}}
-if(type==='dip'){heal=18;B=Math.min(100,B+heal);txt='💰 Bull bought the dip and recovered '+heal+' HP.'}
-if(type==='squeeze'){hit=dmg(42);txt='🔥 SHORT SQUEEZE! Bear takes '+hit.n+' damage.'}
-if(type==='shield'){block=true;txt='🛡️ Bull hedged the position. Next incoming hit is blocked.'}
-if(type==='allin'){if(Math.random()<.18){txt='💀 ALL-IN failed! The market rejected the trade.'}else{hit=dmg(55);txt='💎 ALL-IN! Bull dealt '+hit.n+' damage.'}}
-log((hit.crit?'💥 CRITICAL! ':'')+txt);
-if(hit.n){R=Math.max(0,R-hit.n);anim('bear','shake');anim('bull',hit.crit?'critical':'lungeL')}
-if(R<=0){finish('BULL');return}render();
-setTimeout(bearTurn,650)
+  if(busy||over||!playerSide)return;
+  const costs={pump:10,break:20,dip:15,squeeze:40,shield:12,allin:60};
+  const cost=costs[type];
+  if(BE<cost){log('⚡ Not enough energy.');return}
+  busy=true;BE-=cost;
+
+  let hit=0,heal=0,txt='';
+  if(playerSide==='BULL'){
+    if(type==='pump'){hit=dmg(12+Math.floor(Math.random()*9));txt='🚀 Bull pumped the market for '+hit.n+' damage.'}
+    if(type==='break'){if(Math.random()<.2){txt='📉 Fakeout! The breakout failed.';hit={n:0,crit:false}}else{hit=dmg(25);txt='📈 Bull broke resistance for '+hit.n+' damage.'}}
+    if(type==='dip'){heal=18;B=Math.min(100,B+heal);txt='💰 Bull bought the dip and recovered '+heal+' HP.'}
+    if(type==='squeeze'){hit=dmg(42);txt='🔥 SHORT SQUEEZE! Bear takes '+hit.n+' damage.'}
+    if(type==='shield'){block=true;txt='🛡️ Bull hedged the position. Next incoming hit is blocked.'}
+    if(type==='allin'){if(Math.random()<.18){txt='💀 ALL-IN failed! The market rejected the trade.'}else{hit=dmg(55);txt='💎 ALL-IN! Bull dealt '+hit.n+' damage.'}}
+    if(hit.n){R=Math.max(0,R-hit.n);anim('bear','shake');anim('bull',hit.crit?'critical':'lungeL')}
+  }else{
+    // Bear player: same controls, interpreted as bearish moves.
+    if(type==='pump'){hit=dmg(12+Math.floor(Math.random()*9));txt='📉 Bear dumped the market for '+hit.n+' damage.'}
+    if(type==='break'){if(Math.random()<.2){txt='📈 Short squeeze! The breakdown failed.';hit={n:0,crit:false}}else{hit=dmg(25);txt='📉 Bear broke support for '+hit.n+' damage.'}}
+    if(type==='dip'){heal=18;R=Math.min(100,R+heal);txt='🐻 Bear covered shorts and recovered '+heal+' HP.'}
+    if(type==='squeeze'){hit=dmg(42);txt='🔥 BEAR SQUEEZE! Bull takes '+hit.n+' damage.'}
+    if(type==='shield'){block=true;txt='🛡️ Bear hedged the position. Next incoming hit is blocked.'}
+    if(type==='allin'){if(Math.random()<.18){txt='💀 ALL-IN failed! The market rejected the trade.'}else{hit=dmg(55);txt='💎 ALL-IN! Bear dealt '+hit.n+' damage.'}}
+    if(hit.n){B=Math.max(0,B-hit.n);anim('bull','shake');anim('bear',hit.crit?'critical':'lungeR')}
+  }
+  log((hit.crit?'💥 CRITICAL! ':'')+txt);
+  if((playerSide==='BULL'&&R<=0)||(playerSide==='BEAR'&&B<=0)){finish(playerSide);return}
+  render();
+  setTimeout(opponentTurn,650);
 }
-function bearTurn(){
-if(over)return;let cost=10+Math.floor(Math.random()*16);RE=Math.min(100,RE+12);
-let choice=Math.random(),hit=0,txt='';
-if(choice<.18){let h=15;R=Math.min(100,R+h);txt='🐻 Bear covered shorts and recovered '+h+' HP.'}
-else if(choice<.45){hit=dmg(13+Math.floor(Math.random()*9));txt='📉 Bear dumped for '+hit.n+' damage.'}
-else if(choice<.7){hit=dmg(24);txt='💥 Bear caused a market crash for '+hit.n+' damage.'}
-else if(choice<.88){hit=dmg(32);txt='🩸 Bear opened a massive short for '+hit.n+' damage.'}
-else{hit=dmg(45);txt='☠️ BEAR TRAP! A brutal attack hits for '+hit.n+' damage.'}
-if(hit.n){if(block){txt+=' 🛡️ Hedge blocked it!';hit.n=0;block=false}else{B=Math.max(0,B-hit.n);anim('bull','shake');anim('bear',hit.crit?'critical':'lungeR')}}
-log((hit.crit?'💥 CRITICAL! ':'')+txt);round++;BE=Math.min(100,BE+8);render();
-if(B<=0){finish('BEAR');return}busy=false;$('turn').textContent='Your turn — choose a move';render()
+
+function opponentTurn(){
+  if(over)return;
+  let hit=0,txt='';
+  RE=Math.min(100,RE+12);
+
+  if(playerSide==='BULL'){
+    let choice=Math.random();
+    if(choice<.18){let h=15;R=Math.min(100,R+h);txt='🐻 Bear covered shorts and recovered '+h+' HP.'}
+    else if(choice<.45){hit=dmg(13+Math.floor(Math.random()*9));txt='📉 Bear dumped for '+hit.n+' damage.'}
+    else if(choice<.7){hit=dmg(24);txt='💥 Bear caused a market crash for '+hit.n+' damage.'}
+    else if(choice<.88){hit=dmg(32);txt='🩸 Bear opened a massive short for '+hit.n+' damage.'}
+    else{hit=dmg(45);txt='☠️ BEAR TRAP! A brutal attack hits for '+hit.n+' damage.'}
+    if(hit.n){if(block){txt+=' 🛡️ Hedge blocked it!';hit.n=0;block=false}else{B=Math.max(0,B-hit.n);anim('bull','shake');anim('bear',hit.crit?'critical':'lungeR')}}
+  }else{
+    let choice=Math.random();
+    if(choice<.18){let h=15;B=Math.min(100,B+h);txt='🐂 Bull bought the dip and recovered '+h+' HP.'}
+    else if(choice<.45){hit=dmg(13+Math.floor(Math.random()*9));txt='🚀 Bull pumped for '+hit.n+' damage.'}
+    else if(choice<.7){hit=dmg(24);txt='📈 Bull broke resistance for '+hit.n+' damage.'}
+    else if(choice<.88){hit=dmg(32);txt='🔥 Bull launched a breakout attack for '+hit.n+' damage.'}
+    else{hit=dmg(45);txt='💎 BULL RUN! A brutal attack hits for '+hit.n+' damage.'}
+    if(hit.n){if(block){txt+=' 🛡️ Hedge blocked it!';hit.n=0;block=false}else{R=Math.max(0,R-hit.n);anim('bear','shake');anim('bull',hit.crit?'critical':'lungeL')}}
+  }
+
+  log((hit.crit?'💥 CRITICAL! ':'')+txt);
+  round++;BE=Math.min(100,BE+8);render();
+  if((playerSide==='BULL'&&B<=0)||(playerSide==='BEAR'&&R<=0)){finish(playerSide==='BULL'?'BEAR':'BULL');return}
+  busy=false;$('turn').textContent=playerSide==='BULL'?'🐂 You are BULL — choose a move':'🐻 You are BEAR — choose a move';render();
 }
-function finish(w){over=true;busy=false;if(w==='BULL')stats.bull++;else stats.bear++;saveStats();$('overlay').style.display='flex';$('winner').textContent=w==='BULL'?'🐂 BULL WINS!':'🐻 BEAR WINS!';$('reason').textContent=w==='BULL'?'The bear has been liquidated. 🚀':'The bull has been liquidated. 📉';render()}
-function newGame(){B=100;R=100;BE=100;RE=100;block=false;round=1;busy=false;over=false;$('overlay').style.display='none';$('log').innerHTML='';$('turn').textContent='Your turn — choose a move';log('⚔️ Battle started! The market is neutral.');render()}
-renderStats();
-const cv=$('cv'),ctx=cv.getContext('2d');function draw(){cv.width=cv.clientWidth*devicePixelRatio;cv.height=cv.clientHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);let w=cv.clientWidth,h=cv.clientHeight;ctx.clearRect(0,0,w,h);ctx.beginPath();let y=h*.62;ctx.moveTo(0,y);for(let x=0;x<w;x+=8){y+=(Math.random()-.47)*10;y=Math.max(12,Math.min(h-12,y));ctx.lineTo(x,y)}ctx.lineWidth=3;ctx.strokeStyle='#57d889';ctx.stroke()}window.onresize=draw;draw();newGame();
+
+function finish(w){
+  over=true;busy=false;
+  const playerWon=w===playerSide;
+  if(playerWon){playerPoints+=200;log('🏆 You won the 200-point virtual pool!')}
+  if(w==='BULL')bullWins++;else bearWins++;
+  saveStats();
+  $('overlay').style.display='flex';
+  $('winner').textContent=w==='BULL'?'🐂 BULL WINS!':'🐻 BEAR WINS!';
+  $('reason').textContent=playerWon?'You won +200 virtual Clash Points!':'You lost the 100-point virtual entry.';
+  render();
+}
+
+function newGame(){
+  B=100;R=100;BE=100;RE=100;block=false;round=1;busy=false;over=false;playerSide=null;
+  $('overlay').style.display='none';
+  $('log').innerHTML='';
+  $('turn').textContent='Choose your side to start';
+  $('bs').textContent='Ready to buy';$('rs').textContent='Ready to short';
+  log('⚔️ Battle ready! Choose Bull or Bear. Virtual points only.');
+  render();
+}
+
+const cv=$('cv'),ctx=cv.getContext('2d');
+function draw(){
+  cv.width=cv.clientWidth*devicePixelRatio;cv.height=cv.clientHeight*devicePixelRatio;
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  let w=cv.clientWidth,h=cv.clientHeight;
+  ctx.clearRect(0,0,w,h);ctx.beginPath();let y=h*.62;ctx.moveTo(0,y);
+  for(let x=0;x<w;x+=8){y+=(Math.random()-.47)*10;y=Math.max(12,Math.min(h-12,y));ctx.lineTo(x,y)}
+  ctx.lineWidth=3;ctx.strokeStyle='#57d889';ctx.stroke()
+}
+window.onresize=draw;draw();newGame();
 </script>
 </body>
 </html>
