@@ -7,7 +7,7 @@
 <style>
 *{box-sizing:border-box}body{margin:0;background:#050b14;color:#f5f7fb;font-family:Arial,sans-serif}
 #app{max-width:1180px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}
-h1{margin:0;font-size:30px}.tag{color:#91a4bc}.pill{padding:8px 12px;border:1px solid #263d59;border-radius:999px;background:#0b1726}
+h1{margin:0;font-size:30px}.tag{color:#91a4bc}.pill{padding:8px 12px;border:1px solid #263d59;border-radius:999px;background:#0b1726}.stats{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}.stat{padding:6px 10px;border:1px solid #263d59;border-radius:10px;background:#0b1726;font-size:12px;font-weight:800}.stat span{font-size:15px;margin-left:4px}
 .arena{margin-top:12px;position:relative;height:590px;border:1px solid #29425f;border-radius:24px;overflow:hidden;background:linear-gradient(#10243a,#07101d 68%,#081522)}
 .sky{position:absolute;inset:0;background:radial-gradient(circle at 50% 10%,#274c6d55,transparent 45%)}
 .grid{position:absolute;left:-10%;right:-10%;bottom:-90px;height:300px;transform:perspective(400px) rotateX(58deg);background-image:linear-gradient(#3d628055 1px,transparent 1px),linear-gradient(90deg,#3d628055 1px,transparent 1px);background-size:45px 45px}
@@ -31,7 +31,7 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 </head>
 <body>
 <div id="app">
-<div class="top"><div><h1>🐂 MARKET CLASH 🐻</h1><div class="tag">Bulls vs Bears — fight for market dominance</div></div><div class="pill">💰 Market: <b id="price">$100</b></div></div>
+<div class="top"><div><h1>🐂 MARKET CLASH 🐻</h1><div class="tag">Bulls vs Bears — fight for market dominance</div><div class="stats"><div class="stat">🐂 Player Wins: <span id="bullWins">0</span></div><div class="stat">🐻 Bear Wins: <span id="bearWins">0</span></div><div class="stat">⚔️ Total Battles: <span id="totalWins">0</span></div></div></div><div class="pill">💰 Market: <b id="price">$100</b></div></div>
 <div class="arena" id="arena">
 <div class="sky"></div><div class="grid"></div>
 <div class="chart"><canvas id="cv"></canvas></div>
@@ -61,6 +61,10 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 <script>
 let B,R,BE,RE,block=false,round=1,busy=false,over=false;
 const $=id=>document.getElementById(id);
+const statsKey='marketClashStats';
+let stats=JSON.parse(localStorage.getItem(statsKey)||'{"bull":0,"bear":0}');
+function saveStats(){localStorage.setItem(statsKey,JSON.stringify(stats));renderStats()}
+function renderStats(){const bw=$('bullWins'),rw=$('bearWins'),tw=$('totalWins');if(bw)bw.textContent=stats.bull;if(rw)rw.textContent=stats.bear;if(tw)tw.textContent=stats.bull+stats.bear}
 function log(x){$('log').innerHTML='<div>'+x+'</div>'+$('log').innerHTML}
 function render(){ $('bhp').style.width=B+'%';$('rhp').style.width=R+'%';$('be').style.width=BE+'%';$('re').style.width=RE+'%';$('price').textContent='$'+Math.max(1,Math.round(100+(B-R)*.35));$('round').textContent='ROUND '+round;
 document.querySelectorAll('.moves button').forEach(x=>x.disabled=busy||over)}
@@ -94,8 +98,9 @@ if(hit.n){if(block){txt+=' 🛡️ Hedge blocked it!';hit.n=0;block=false}else{B
 log((hit.crit?'💥 CRITICAL! ':'')+txt);round++;BE=Math.min(100,BE+8);render();
 if(B<=0){finish('BEAR');return}busy=false;$('turn').textContent='Your turn — choose a move';render()
 }
-function finish(w){over=true;busy=false;$('overlay').style.display='flex';$('winner').textContent=w==='BULL'?'🐂 BULL WINS!':'🐻 BEAR WINS!';$('reason').textContent=w==='BULL'?'The bear has been liquidated. 🚀':'The bull has been liquidated. 📉';render()}
+function finish(w){over=true;busy=false;if(w==='BULL')stats.bull++;else stats.bear++;saveStats();$('overlay').style.display='flex';$('winner').textContent=w==='BULL'?'🐂 BULL WINS!':'🐻 BEAR WINS!';$('reason').textContent=w==='BULL'?'The bear has been liquidated. 🚀':'The bull has been liquidated. 📉';render()}
 function newGame(){B=100;R=100;BE=100;RE=100;block=false;round=1;busy=false;over=false;$('overlay').style.display='none';$('log').innerHTML='';$('turn').textContent='Your turn — choose a move';log('⚔️ Battle started! The market is neutral.');render()}
+renderStats();
 const cv=$('cv'),ctx=cv.getContext('2d');function draw(){cv.width=cv.clientWidth*devicePixelRatio;cv.height=cv.clientHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);let w=cv.clientWidth,h=cv.clientHeight;ctx.clearRect(0,0,w,h);ctx.beginPath();let y=h*.62;ctx.moveTo(0,y);for(let x=0;x<w;x+=8){y+=(Math.random()-.47)*10;y=Math.max(12,Math.min(h-12,y));ctx.lineTo(x,y)}ctx.lineWidth=3;ctx.strokeStyle='#57d889';ctx.stroke()}window.onresize=draw;draw();newGame();
 </script>
 </body>
