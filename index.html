@@ -35,6 +35,102 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 @keyframes shake{25%{transform:translateX(-22px)}75%{transform:translateX(22px)}}@keyframes lungeL{50%{transform:translateX(65px)}}@keyframes lungeR{50%{transform:translateX(-65px)}}@keyframes crit{50%{filter:drop-shadow(0 0 25px #fff) scale(1.12)}}
 @media(max-width:760px){h1{font-size:22px}.arena{height:700px}.fighter{bottom:220px;width:170px}.bull{left:2%}.bear{right:2%}.char{font-size:85px}.hud{grid-template-columns:1fr 55px 1fr}.vs{font-size:18px}.moves{grid-template-columns:repeat(3,1fr)}.controls{bottom:8px}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js">
+const CONTRACT_ADDRESS = "PASTE_YOUR_DEPLOYED_CONTRACT_ADDRESS_HERE";
+const SEPOLIA_CHAIN_ID = 11155111n;
+const CONTRACT_ABI = [
+  "function battleCount() view returns (uint256)",
+  "function STAKE() view returns (uint256)",
+  "function createBattle() payable returns (uint256)",
+  "function joinAsBear(uint256 battleId) payable",
+  "function finishBattle(uint256 battleId, uint8 winner)",
+  "function battles(uint256) view returns (address bullPlayer,address bearPlayer,uint256 stake,uint8 winner,bool finished)"
+];
+
+let onchainProvider, onchainSigner, onchainContract;
+
+function setOnchainStatus(msg){ 
+  const e=document.getElementById("onchainStatus"); 
+  if(e) e.textContent=msg; 
+}
+
+async function connectOnchain(){
+  if(!window.ethereum){
+    setOnchainStatus("❌ No browser wallet found. Install MetaMask.");
+    return;
+  }
+  if(CONTRACT_ADDRESS.includes("PASTE_")){
+    setOnchainStatus("⚠️ Add your deployed contract address to the game file first.");
+    return;
+  }
+  try{
+    await window.ethereum.request({method:"eth_requestAccounts"});
+    onchainProvider = new ethers.BrowserProvider(window.ethereum);
+    const network = await onchainProvider.getNetwork();
+    if(network.chainId !== SEPOLIA_CHAIN_ID){
+      setOnchainStatus("⚠️ Switch MetaMask to Ethereum Sepolia (chain 11155111).");
+      return;
+    }
+    onchainSigner = await onchainProvider.getSigner();
+    const addr = await onchainSigner.getAddress();
+    onchainContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, onchainSigner);
+    document.getElementById("createOnchainBtn").disabled=false;
+    document.getElementById("joinOnchainBtn").disabled=false;
+    document.getElementById("connectOnchainBtn").textContent="✅ Wallet Connected";
+    setOnchainStatus("Connected: "+shortAddr(addr)+" · Ethereum Sepolia");
+  }catch(e){
+    setOnchainStatus("❌ "+(e.shortMessage||e.message||"Wallet connection failed"));
+  }
+}
+
+async function createOnchainBattle(){
+  try{
+    if(!onchainContract) return await connectOnchain();
+    setOnchainStatus("⏳ Creating Bull battle…");
+    const tx=await onchainContract.createBattle({value:ethers.parseEther("0.001")});
+    setOnchainStatus("⏳ Waiting for transaction…");
+    const receipt=await tx.wait();
+    let idText="created";
+    try{
+      const count=await onchainContract.battleCount();
+      idText=count.toString();
+      document.getElementById("battleIdInput").value=idText;
+    }catch(_){}
+    setOnchainStatus("✅ Bull battle #"+idText+" created. Tx: "+receipt.hash.slice(0,12)+"…");
+  }catch(e){
+    setOnchainStatus("❌ "+(e.shortMessage||e.reason||e.message||"Transaction failed"));
+  }
+}
+
+async function joinOnchainBattle(){
+  try{
+    if(!onchainContract) return await connectOnchain();
+    const id=Number(document.getElementById("battleIdInput").value);
+    if(!id){setOnchainStatus("⚠️ Enter a Battle ID.");return;}
+    setOnchainStatus("⏳ Joining battle #"+id+" as Bear…");
+    const tx=await onchainContract.joinAsBear(id,{value:ethers.parseEther("0.001")});
+    setOnchainStatus("⏳ Waiting for transaction…");
+    await tx.wait();
+    setOnchainStatus("✅ Joined battle #"+id+" as Bear. Both players are now in the pool.");
+  }catch(e){
+    setOnchainStatus("❌ "+(e.shortMessage||e.reason||e.message||"Transaction failed"));
+  }
+}
+
+if(window.ethereum){
+  window.ethereum.on?.("chainChanged",()=>location.reload());
+  window.ethereum.on?.("accountsChanged",()=>location.reload());
+}
+
+</script>
+<style>
+.onchain{margin-top:14px;padding:14px;border:1px solid #29425f;border-radius:14px;background:#0a1625}
+.onchain h3{margin:0 0 8px}
+.onchainrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.onchain input{width:100px}
+.smallnote{font-size:11px;color:#8fa6bf;margin-top:7px;line-height:1.4}
+.contractstatus{font-size:12px;color:#a9c0d8;margin-top:8px}
+</style>
 </head>
 <body>
 <div id="app">
@@ -68,6 +164,21 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 <div id="overlay"><div class="winbox"><h2 id="winner">BULL WINS!</h2><p id="reason">The bear was liquidated.</p><button onclick="newGame()">⚔️ Fight Again</button></div></div>
 <div class="controls">
 <div class="turn" id="turn">Choose your side to start</div>
+<div class="onchain">
+  <h3>⛓️ Testnet On-Chain Mode</h3>
+  <div class="onchainrow">
+    <button id="connectOnchainBtn" onclick="connectOnchain()">🔗 Connect Wallet</button>
+    <button id="createOnchainBtn" onclick="createOnchainBattle()" disabled>🐂 Create Bull Battle</button>
+    <input id="battleIdInput" type="number" min="1" placeholder="Battle ID">
+    <button id="joinOnchainBtn" onclick="joinOnchainBattle()" disabled>🐻 Join as Bear</button>
+  </div>
+  <div class="contractstatus" id="onchainStatus">Wallet not connected</div>
+  <div class="smallnote">
+    Base/Ethereum testnet only. This prototype uses 0.001 Sepolia ETH per player.
+    The current contract is for testing only; its winner function is not secure for real money.
+  </div>
+</div>
+
 <div style="display:flex;justify-content:center;gap:8px;margin-bottom:9px;flex-wrap:wrap">
 <button onclick="chooseSide('BULL')" id="bullSide">🐂 Play Bull</button>
 <button onclick="chooseSide('BEAR')" id="bearSide">🐻 Play Bear</button>
