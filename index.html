@@ -78,18 +78,10 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
   <span id="walletStatus" style="font-size:12px;color:#9db1c8;">Wallet not connected · Virtual points only</span>
 </div>
 <div class="turn" id="turn">Connect your wallet, then choose Bull or Bear</div>
-<div class="onchain">
-  <h3>⛓️ Testnet On-Chain Mode</h3>
-  <div class="onchainrow">
-    <button id="connectOnchainBtn" onclick="connectOnchain()">🔗 Connect Wallet</button>
-    <button id="createOnchainBtn" onclick="createOnchainBattle()" disabled>🐂 Create Bull Battle</button>
-    <input id="battleIdInput" type="number" min="1" placeholder="Battle ID">
-    <button id="joinOnchainBtn" onclick="joinOnchainBattle()" disabled>🐻 Join as Bear</button>
-  </div>
+
   <div class="contractstatus" id="onchainStatus">Wallet not connected</div>
   <div class="smallnote">
-    Base/Ethereum testnet only. This prototype uses 0.001 Sepolia ETH per player.
-    The current contract is for testing only; its winner function is not secure for real money.
+
   </div>
 </div>
 
