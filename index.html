@@ -35,8 +35,6 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 @keyframes shake{25%{transform:translateX(-22px)}75%{transform:translateX(22px)}}@keyframes lungeL{50%{transform:translateX(65px)}}@keyframes lungeR{50%{transform:translateX(-65px)}}@keyframes crit{50%{filter:drop-shadow(0 0 25px #fff) scale(1.12)}}
 @media(max-width:760px){h1{font-size:22px}.arena{height:700px}.fighter{bottom:220px;width:170px}.bull{left:2%}.bear{right:2%}.char{font-size:85px}.hud{grid-template-columns:1fr 55px 1fr}.vs{font-size:18px}.moves{grid-template-columns:repeat(3,1fr)}.controls{bottom:8px}}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js">
-</script>
 <style>
 
 </style>
@@ -72,17 +70,7 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 <div class="fighter bear" id="bear"><div class="char">🐻</div><div class="name">BEAR</div><div class="status" id="rs">Ready to short</div></div>
 <div id="overlay"><div class="winbox"><h2 id="winner">BULL WINS!</h2><p id="reason">The bear was liquidated.</p><button onclick="newGame()">⚔️ Fight Again</button></div></div>
 <div class="controls">
-
-<div id="walletBar" style="margin:10px 0 12px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;">
-  <button id="connectWalletBtn" onclick="connectVirtualWallet()">🔗 Connect Wallet</button>
-  <span id="walletStatus" style="font-size:12px;color:#9db1c8;">Wallet not connected · Virtual points only</span>
-</div>
 <div class="turn" id="turn">Connect your wallet, then choose Bull or Bear</div>
-
-  <div class="contractstatus" id="onchainStatus">Wallet not connected</div>
-  <div class="smallnote">
-
-  </div>
 </div>
 
 <div style="display:flex;justify-content:center;gap:8px;margin-bottom:9px;flex-wrap:wrap">
@@ -90,7 +78,7 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 <button onclick="chooseSide('BEAR')" id="bearSide">🐻 Play Bear</button>
 </div>
 <div style="text-align:center;font-size:12px;color:#9db1c8;margin-bottom:9px">
-Virtual entry: <b>100 Clash Points</b> · Winner receives the virtual pool
+Free virtual battle · Choose Bull or Bear · Winner gets <b>+200 Clash Points</b>
 </div>
 <div class="moves">
 <button onclick="attack('pump')"><b>🚀</b>Pump<div class="moveinfo">12–20 dmg · 10 EN</div></button>
@@ -230,15 +218,19 @@ function opponentTurn(){
 }
 
 function finish(w){
-  over=true;busy=false;
-  const playerWon=w===playerSide;
-  if(playerWon){playerPoints+=200;log('🏆 You won the 200-point virtual pool!')}
-  if(w==='BULL')bullWins++;else bearWins++;
+  over=true;
+  if(w===playerSide){
+    playerPoints+=200;
+    if(w==='BULL')bullWins++; else bearWins++;
+    $('winner').textContent='🎉 YOU WIN!';
+    $('reason').textContent='Your '+(w==='BULL'?'Bull':'Bear')+' side won. +200 Clash Points!';
+  }else{
+    $('winner').textContent='💀 YOU LOSE';
+    $('reason').textContent='The '+(w==='BULL'?'Bull':'Bear')+' side won.';
+  }
   saveStats();
-  $('overlay').style.display='flex';
-  $('winner').textContent=w==='BULL'?'🐂 BULL WINS!':'🐻 BEAR WINS!';
-  $('reason').textContent=playerWon?'You won +200 virtual Clash Points!':'You lost the 100-point virtual entry.';
   render();
+  $('overlay').style.display='flex';
 }
 
 function newGame(){
@@ -261,49 +253,6 @@ function draw(){
   ctx.lineWidth=3;ctx.strokeStyle='#57d889';ctx.stroke()
 }
 window.onresize=draw;draw();newGame();
-</script>
-
-<script>
-let virtualWallet = null;
-
-function shortWallet(a){
-  return a ? a.slice(0,6) + "..." + a.slice(-4) : "";
-}
-
-async function connectVirtualWallet(){
-  const status = document.getElementById("walletStatus");
-  const btn = document.getElementById("connectWalletBtn");
-
-  if(!window.ethereum){
-    status.textContent = "⚠️ Install MetaMask to connect a wallet.";
-    return;
-  }
-
-  try{
-    const accounts = await window.ethereum.request({method:"eth_requestAccounts"});
-    if(accounts && accounts[0]){
-      virtualWallet = accounts[0];
-      status.textContent = "✅ Wallet connected: " + shortWallet(virtualWallet) + " · Virtual points only";
-      btn.textContent = "✅ Connected";
-    }
-  }catch(e){
-    status.textContent = "❌ Wallet connection cancelled.";
-  }
-}
-
-if(window.ethereum){
-  window.ethereum.on?.("accountsChanged", (accounts)=>{
-    if(accounts && accounts[0]){
-      virtualWallet = accounts[0];
-      const s=document.getElementById("walletStatus");
-      const b=document.getElementById("connectWalletBtn");
-      if(s) s.textContent="✅ Wallet connected: "+shortWallet(virtualWallet)+" · Virtual points only";
-      if(b) b.textContent="✅ Connected";
-    }else{
-      virtualWallet=null;
-    }
-  });
-}
 </script>
 
 </body>
