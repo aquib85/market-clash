@@ -73,7 +73,7 @@ button b{display:block;font-size:18px}.moveinfo{font-size:10px;color:#9db1c8;fon
 <button onclick="chooseSide('BEAR')" id="bearSide">🐻 Play Bear</button>
 </div>
 <div style="text-align:center;font-size:12px;color:#9db1c8;margin-bottom:9px">
-Virtual entry: <b>100 Clash Points</b> · Winner receives the virtual pool
+Virtual battle: 100 Clash Points · Winner receives +200 virtual points
 </div>
 <div class="moves">
 <button onclick="attack('pump')"><b>🚀</b>Pump<div class="moveinfo">12–20 dmg · 10 EN</div></button>
@@ -89,17 +89,26 @@ Virtual entry: <b>100 Clash Points</b> · Winner receives the virtual pool
 </div>
 <script>
 let B,R,BE,RE,block=false,round=1,busy=false,over=false;
-let playerSide=null, playerPoints=Number(localStorage.getItem('mc_points')||1000);
-let bullWins=Number(localStorage.getItem('mc_bullWins')||0);
-let bearWins=Number(localStorage.getItem('mc_bearWins')||0);
+let playerSide=null, playerPoints=1000;
+let bullWins=0;
+let bearWins=0;
 let walletAddress=null;
+
+function playerStorageKey(){return walletAddress?'mc_player_'+walletAddress.toLowerCase():null}
+function loadPlayer(){
+  if(!walletAddress)return;
+  const saved=JSON.parse(localStorage.getItem(playerStorageKey())||'null');
+  playerPoints=saved&&Number.isFinite(Number(saved.points))?Number(saved.points):1000;
+  bullWins=saved&&Number.isFinite(Number(saved.bullWins))?Number(saved.bullWins):0;
+  bearWins=saved&&Number.isFinite(Number(saved.bearWins))?Number(saved.bearWins):0;
+}
+
 
 const $=id=>document.getElementById(id);
 function log(x){$('log').innerHTML='<div>'+x+'</div>'+$('log').innerHTML}
 function saveStats(){
-  localStorage.setItem('mc_points',String(playerPoints));
-  localStorage.setItem('mc_bullWins',String(bullWins));
-  localStorage.setItem('mc_bearWins',String(bearWins));
+  if(!walletAddress)return;
+  localStorage.setItem(playerStorageKey(),JSON.stringify({points:playerPoints,bullWins, bearWins}));
 }
 function shortAddr(a){return a?a.slice(0,6)+'…'+a.slice(-4):'Wallet not connected'}
 function render(){
@@ -125,6 +134,7 @@ async function connectWallet(){
   try{
     const accounts=await window.ethereum.request({method:'eth_requestAccounts'});
     walletAddress=accounts[0];
+    loadPlayer();
     $('walletAddr').textContent=shortAddr(walletAddress);
     $('walletBtn').textContent='✅ Wallet Connected';
     log('🔗 Wallet connected: '+shortAddr(walletAddress));
